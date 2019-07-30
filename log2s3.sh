@@ -1,62 +1,83 @@
 #!/bin/bash
 
-# config variables
+# 설정값
 CFG_NAME=""
 CFG_PATH=""
 CFG_INTERVAL=7
-CFG_DATE_PATTERN="+%Y%m%d"
+CFG_DATE_PATTERN="+_%Y%m%d"
 CFG_DATE=""
 CFG_AWS_BUCKET="log-backup"
 CFG_AWS_PROFILE="default"
 
-# variables
+# 변수 생성
 V_BASE_PATH=$( cd "$(dirname "$0")" ; pwd )
 V_BACKUP_LOG=${V_BASE_PATH}"/logs/`date +%Y%m%d`.log"
 V_TEMP_PATH=${V_BASE_PATH}"/temp_logs"
 V_TARGET_DATE=''
 
-# arguments to array
-args=("$@")
 
-
-# check and create directory for this process log
+# 로그 디렉토리 확인 및 생성
 if [ ! -d "${V_BASE_PATH}/logs/" ] ; then
-    # create directory
+    # 디렉토리 생성
+    echo "디렉토리 생성: ${V_BASE_PATH}/logs/"
     `mkdir ${V_BASE_PATH}/logs/`
 fi
 
 
-# echo message with format
+# 메시지 출력 및 기록(형식 지정)
 function echoWformat() {
     echo "[`date +%Y-%m-%d' '%H:%M:%S` | $CFG_NAME] "$1
     echo "[`date +%Y-%m-%d' '%H:%M:%S` | $CFG_NAME] "$1 >> $V_BACKUP_LOG
 }
 
 
-# help message
-V_HELP_MSG="Log backup to AWS S3 script (ver. 1.0)
+# 도움말
+V_HELP_MSG="
+Log file backup to AWS S3 (ver. 0.7)
 
-there desc string...
+파일을 압축해서 AWS S3에 업로드하는 로그 백업 스크립트 입니다. 지정된 폴더 안에 있는 파일 중 
+파일이름이 특정 날짜 패턴을 가지는 모든 파일을 압축해서 AWS S3에 업로드 합니다.
+※ AWS CLI 설치 및 AWS profile 설정이 필요합니다.
 
-usage: sh log_backup.sh [parameters]
-    ex) sh log_backup.sh -n\"test_log\" -p\"/var/www/html/logs\"
+usage: sh log2s3.sh [parameters]
+    ex) sh log2s3.sh -n\"test_log\" -p\"/var/www/html/logs\"
 
 parameters:
-    -h Show help message (this) - required
-    -n Set name. It used to directory names(temp and S3) and filename. - required
-    -p Path with log file. This process backs up the files in this directory.
-    -i Interval of backup dates. This prdcess backs up the 'Interval' ago days. If '-d' arg set, this arg is ignored.
-    -D Date pattern. ex) +%Y%m%d
-    -d Target date. Backs up files of the specified date. ex) 20190729 or 2019-07-29 or etc...
-    -b S3 Bucket name. Default value is 'log-backup'
-    -P aws profile name. Default value is 'default'
+    -h  도움말을 출력합니다.
+    -n  로그 백업 이름을 설정합니다. (필수)
+        S3 버킷안의 백업 폴더 이름 및 백업 파일 이름에 사용됩니다.
+    -p  백업할 로그 폴더를 설정 합니다. (필수)
+        해당 폴더 안에 있는 파일에 대해 백업 작업을 수행합니다.
+    -i  백업 간격을 설정 합니다.
+        실행 시점에서 'i'일 전 파일에 대해 백업 작업을 수행합니다.
+        '-d' 옵션이 설정되면 이 옵션은 무시됩니다.
+        기본값은 '7'입니다.
+    -D  날짜 형식을 설정합니다. 
+        백업할 로그 파일을 비교하기 위해 로그 파일의 날짜 부분 형식을 설정합니다.
+        'date' 명령의 FORMAT 형식을 사용합니다.
+        '-d' 옵션이 설정되면 이 옵션은 무시됩니다.
+        기본값은 '+_%Y%m%d'입니다.
+    -d  백업 대상 날짜를 지정합니다.
+        전달 받은 문자열 전후에 와일드카드 문자(*)를 추가 후 매칭되는 파일에 대해 백업 작업을 수행합니다.
+        이 옵션이 설정될 경우 '-i', '-D' 옵션은 무시됩니다.
+        ex) 20190729 -> *20190729*
+            _20190729 -> *_20190729*
+    -b  백업한 로그파일이 저장될 S3의 버킷 이름을 설정합니다
+        기본값은 'log-backup' 입니다.
+    -P  S3 업로드에 사용할 AWS 프로필 이름을 지정합니다.
+        기본값은 'default' 입니다.
+
+※ Visit to GitHub: https://github.com/eminuk/log2s3
 "
 
-# check arguments and assort
+# 입력값 배열에 저장
+args=("$@")
+
+
+# 입력값 확인 및 분류
 for ((i=0; i<$#; i++))
 do
     case ${args[$i]:0:2} in
-        
         -n) CFG_NAME=${args[$i]:2:$((${#args[$i]}-2))} ;;
         -p) CFG_PATH=${args[$i]:2:$((${#args[$i]}-2))} ;;
         -i) CFG_INTERVAL=${args[$i]:2:$((${#args[$i]}-2))} ;;
@@ -71,17 +92,17 @@ do
     esac
 done
 
-# TODO: input validation
-# required arguments
+# TODO: 입력값 검증 로직
+# 필수값 확인
 if [ -z "$CFG_NAME" ] || [ -z "$CFG_PATH" ] ; then
-    echo "required arguments is missing. Check help message - \"sh log_backup.sh -h\""
+    echo "필수 입력값이 누락되어 있습니다. 도움말을 참고해 주세요. - \"sh log_backup.sh -h\""
     exit 0
 fi
-# CFG_PATH remove last '/'
+# CFG_PATH의 마지막 '/' 제거
 CFG_PATH=${CFG_PATH%/}
 
 
-# set V_TARGET_DATE
+# V_TARGET_DATE 값 설정
 if [ -z $CFG_DATE ] ; then
     V_TARGET_DATE=`date -d "$CFG_INTERVAL day ago" "$CFG_DATE_PATTERN"`
 else
@@ -89,53 +110,53 @@ else
 fi
 
 
-# TODO: same 'CFG_NAME' process check
+# TODO: 'CFG_NAME' 이 같은 값을 가지는 프로세스 중복 실행되지 않게
 
 
-# echo message 
-echoWformat "log-backup process start."
-echoWformat "Arguments list: $*"
-echoWformat "Name of log backup: $CFG_NAME"
-echoWformat "Target log path: $CFG_PATH"
-echoWformat "Target date: $V_TARGET_DATE"
+# 메시지 출력
+echoWformat "로그파일 백업 프로세스 시작."
+echoWformat "입력값 목록: $*"
+echoWformat "로그 백업 이름: $CFG_NAME"
+echoWformat "백업 대상 경로: $CFG_PATH"
+echoWformat "백업 대상 날짜: $V_TARGET_DATE"
 
 
-# check and create directory for temporary file
+# 압축된 로그파일이 저장될 임시 폴더 확인 및 생성
 if [ ! -d "$V_TEMP_PATH/$CFG_NAME" ] ; then
-    # create directory
-    echoWformat "Create directory: $V_TEMP_PATH/$CFG_NAME" 
+    # 디렉토리 생성
+    echoWformat "디렉토리 생성: $V_TEMP_PATH/$CFG_NAME" 
     `mkdir -p $V_TEMP_PATH/$CFG_NAME`
 fi
 
 
-# zip log files
-V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}__${V_TARGET_DATE}.tar.gz *_${V_TARGET_DATE}*" #--remove-files
-echoWformat "Zip log files: $V_CMD_STR"
+# log 파일 압축
+V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}__${V_TARGET_DATE}.tar.gz *${V_TARGET_DATE}*" #--remove-files
+echoWformat "log 파일 압축: $V_CMD_STR"
 CMD_MSG=` { cd ${CFG_PATH}/ && $V_CMD_STR ; } 2>&1 `
 echoWformat "$CMD_MSG"
 
 
-# S3 bucketet check
+# S3 버킷 확인
 V_CMD_STR="aws s3api head-bucket --bucket ${CFG_AWS_BUCKET} --profile ${CFG_AWS_PROFILE}"
-echoWformat "Bucket check: $V_CMD_STR"
+echoWformat "S3 버킷 확인: $V_CMD_STR"
 CMD_MSG=$( { $V_CMD_STR ; } 2>&1 )
 echoWformat "$CMD_MSG"
 
 
-# S3 upload - if bucket is ok
+# S3 업로드 - 버킷 권한이 있을 경우
 if [ -z "$CMD_MSG" ] ; then
-    # S3 upload
+    # S3 업로드
     V_CMD_STR="aws s3 mv ${V_TEMP_PATH}/${CFG_NAME}/ s3://${CFG_AWS_BUCKET}/${CFG_NAME}/ --recursive --profile ${CFG_AWS_PROFILE}"
-    echoWformat "S3 Upload: $V_CMD_STR"
+    echoWformat "S3 업로드: $V_CMD_STR"
     CMD_MSG=` { $V_CMD_STR ; } 2>&1 `
     echoWformat "$CMD_MSG"
 else
-    echoWformat "Bucket not found."
+    echoWformat "S3 버킷에 접근할 수 없습니다."
 fi
 
 
 echo -e "\n\n\n\n"
 
 
-# echo message
-echoWformat "log-backup process finished at $SECONDS sec"
+# 메시지 출력
+echoWformat "로그파일 백업 프로세스 종료. 약 ${SECONDS} 초 소요"
