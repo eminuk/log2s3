@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # 설정값
 CFG_NAME=""
 CFG_PATH=""
@@ -40,12 +41,13 @@ Log file backup to AWS S3 (ver. 0.7)
 ※ AWS CLI 설치 및 AWS profile 설정이 필요합니다.
 
 usage: sh log2s3.sh [parameters]
-    ex) sh log2s3.sh -n\"test_log\" -p\"/var/www/html/logs\"
+    ex) sh log2s3.sh -n\"test_log\" -p\"/var/www/html/logs\" -i14 -b\"/log_backup\" -P\"log_profile\"
 
 parameters:
     -h  도움말을 출력합니다.
     -n  로그 백업 이름을 설정합니다. (필수)
         S3 버킷안의 백업 폴더 이름 및 백업 파일 이름에 사용됩니다.
+        ※ 주의: 같은 이름을 중복해서 사용할 경우 백업 파일이 덮어쓰기되어 소실될 수 있습니다.
     -p  백업할 로그 폴더를 설정 합니다. (필수)
         해당 폴더 안에 있는 파일에 대해 백업 작업을 수행합니다.
     -i  백업 간격을 설정 합니다.
@@ -70,6 +72,7 @@ parameters:
 ※ Visit to GitHub: https://github.com/eminuk/log2s3
 "
 
+
 # 입력값 배열에 저장
 args=("$@")
 
@@ -91,6 +94,7 @@ do
             exit 0 ;;
     esac
 done
+
 
 # TODO: 입력값 검증 로직
 # 필수값 확인
@@ -130,9 +134,10 @@ fi
 
 
 # log 파일 압축
-V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}__${V_TARGET_DATE}.tar.gz *${V_TARGET_DATE}*" #--remove-files
+V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}_${V_TARGET_DATE}.tar.gz *${V_TARGET_DATE}*" #--remove-files
 echoWformat "log 파일 압축: $V_CMD_STR"
 CMD_MSG=` { cd ${CFG_PATH}/ && $V_CMD_STR ; } 2>&1 `
+# TODO: 메시지 출력 형식 정비
 echoWformat "$CMD_MSG"
 
 
@@ -140,8 +145,6 @@ echoWformat "$CMD_MSG"
 V_CMD_STR="aws s3api head-bucket --bucket ${CFG_AWS_BUCKET} --profile ${CFG_AWS_PROFILE}"
 echoWformat "S3 버킷 확인: $V_CMD_STR"
 CMD_MSG=$( { $V_CMD_STR ; } 2>&1 )
-echoWformat "$CMD_MSG"
-
 
 # S3 업로드 - 버킷 권한이 있을 경우
 if [ -z "$CMD_MSG" ] ; then
@@ -149,14 +152,14 @@ if [ -z "$CMD_MSG" ] ; then
     V_CMD_STR="aws s3 mv ${V_TEMP_PATH}/${CFG_NAME}/ s3://${CFG_AWS_BUCKET}/${CFG_NAME}/ --recursive --profile ${CFG_AWS_PROFILE}"
     echoWformat "S3 업로드: $V_CMD_STR"
     CMD_MSG=` { $V_CMD_STR ; } 2>&1 `
-    echoWformat "$CMD_MSG"
+    # TODO: 메시지 출력 형식 정비
+    echoWformat "${CMD_MSG}"
 else
+    echoWformat "$CMD_MSG"
     echoWformat "S3 버킷에 접근할 수 없습니다."
 fi
 
 
-echo -e "\n\n\n\n"
-
-
 # 메시지 출력
 echoWformat "로그파일 백업 프로세스 종료. 약 ${SECONDS} 초 소요"
+exit 0
