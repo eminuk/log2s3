@@ -136,9 +136,23 @@ fi
 # log 파일 압축
 V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}_${V_TARGET_DATE}.tar.gz *${V_TARGET_DATE}*" #--remove-files
 echoWformat "log 파일 압축: $V_CMD_STR"
-CMD_MSG=` { cd ${CFG_PATH}/ && $V_CMD_STR ; } 2>&1 `
-# TODO: 메시지 출력 형식 정비
-echoWformat "$CMD_MSG"
+
+# TODO: 표준에러 기록 형식 정비 필요
+CMD_MSG=` { cd ${CFG_PATH}/ && $V_CMD_STR ; } 2>> $V_BACKUP_LOG`
+if [ -z "$CMD_MSG" ] ; then
+    echoWformat "로그 파일 압축 실패"
+
+    # 압축파일 삭제
+    V_CMD_STR="rm -f $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}_${V_TARGET_DATE}.tar.gz"
+    echoWformat "실패한 파일 삭제: ${V_CMD_STR}"
+    CMD_MSG=` { $V_CMD_STR ; } 2>&1`
+
+    echoWformat "로그파일 백업 프로세스 종료. 약 ${SECONDS} 초 소요"
+    exit 1
+else
+    # TODO: 메시지 출력 형식 정비
+    echoWformat "$CMD_MSG"
+fi
 
 
 # S3 버킷 확인
@@ -146,12 +160,13 @@ V_CMD_STR="aws s3api head-bucket --bucket ${CFG_AWS_BUCKET} --profile ${CFG_AWS_
 echoWformat "S3 버킷 확인: $V_CMD_STR"
 CMD_MSG=$( { $V_CMD_STR ; } 2>&1 )
 
+
 # S3 업로드 - 버킷 권한이 있을 경우
 if [ -z "$CMD_MSG" ] ; then
     # S3 업로드
     V_CMD_STR="aws s3 mv ${V_TEMP_PATH}/${CFG_NAME}/ s3://${CFG_AWS_BUCKET}/${CFG_NAME}/ --recursive --profile ${CFG_AWS_PROFILE}"
     echoWformat "S3 업로드: $V_CMD_STR"
-    CMD_MSG=` { $V_CMD_STR ; } 2>&1 `
+    CMD_MSG=` $V_CMD_STR 2>&1 `
     # TODO: 메시지 출력 형식 정비
     echoWformat "${CMD_MSG}"
 else
