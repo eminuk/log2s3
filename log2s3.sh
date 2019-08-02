@@ -7,7 +7,7 @@ CFG_PATH=""
 CFG_INTERVAL=7
 CFG_DATE_PATTERN="+_%Y%m%d"
 CFG_DATE=""
-CFG_AWS_BUCKET="log-backup"
+CFG_AWS_BUCKET=""
 CFG_AWS_PROFILE="default"
 
 # 변수 생성
@@ -34,7 +34,7 @@ function echoWformat() {
 
 # 도움말
 V_HELP_MSG="
-Log file backup to AWS S3 (ver. 0.7)
+Log file backup to AWS S3 (ver. 0.8)
 
 파일을 압축해서 AWS S3에 업로드하는 로그 백업 스크립트 입니다. 지정된 폴더 안에 있는 파일 중 
 파일이름이 특정 날짜 패턴을 가지는 모든 파일을 압축해서 AWS S3에 업로드 합니다.
@@ -64,8 +64,7 @@ parameters:
         이 옵션이 설정될 경우 '-i', '-D' 옵션은 무시됩니다.
         ex) 20190729 -> *20190729*
             _20190729 -> *_20190729*
-    -b  백업한 로그파일이 저장될 S3의 버킷 이름을 설정합니다
-        기본값은 'log-backup' 입니다.
+    -b  백업한 로그파일이 저장될 S3의 버킷 이름을 설정합니다. (필수)
     -P  S3 업로드에 사용할 AWS 프로필 이름을 지정합니다.
         기본값은 'default' 입니다.
 
@@ -98,7 +97,7 @@ done
 
 # TODO: 입력값 검증 로직
 # 필수값 확인
-if [ -z "$CFG_NAME" ] || [ -z "$CFG_PATH" ] ; then
+if [ -z "$CFG_NAME" ] || [ -z "$CFG_PATH" ] || [ -z "$CFG_AWS_BUCKET" ] ; then
     echo "필수 입력값이 누락되어 있습니다. 도움말을 참고해 주세요. - \"sh log_backup.sh -h\""
     exit 0
 fi
@@ -134,7 +133,7 @@ fi
 
 
 # log 파일 압축
-V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}_${V_TARGET_DATE}.tar.gz *${V_TARGET_DATE}*" #--remove-files
+V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}_${V_TARGET_DATE}.tar.gz *${V_TARGET_DATE}*" --remove-files
 echoWformat "log 파일 압축: $V_CMD_STR"
 
 # TODO: 표준에러 기록 형식 정비 필요
