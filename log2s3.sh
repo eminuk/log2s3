@@ -133,7 +133,7 @@ fi
 
 
 # log 파일 압축
-V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}_${V_TARGET_DATE}.tar.gz *${V_TARGET_DATE}*" --remove-files
+V_CMD_STR="tar cvzfP $V_TEMP_PATH/$CFG_NAME/${CFG_NAME}_${V_TARGET_DATE}.tar.gz *${V_TARGET_DATE}* --remove-files"
 echoWformat "log 파일 압축: $V_CMD_STR"
 
 # TODO: 표준에러 기록 형식 정비 필요
