@@ -158,7 +158,7 @@ aws --v
 aws-cli/1.16.102 Python/2.7.16 Linux/4.14.128-112.105.amzn2.x86_64 botocore/1.12.92
 ```
 
-설치 도어 있지 알을 경우 결과 예시: 
+설치 되어 있지 알을 경우 결과 예시: 
 ``` 
 -bash: aws: command not found
 ```
